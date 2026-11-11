@@ -1,4 +1,5 @@
 const Author = require('../models/Author');
+const Book = require('../models/Book');
 
 // POST /authors
 exports.createAuthor = async (req, res) => {
@@ -65,6 +66,18 @@ exports.deleteAuthor = async (req, res) => {
       return res.status(404).json({ message: 'Author not found' });
     }
     res.json({ message: 'Author deleted' });
+  } catch (err) {
+    if (err.name === 'CastError') {
+      return res.status(400).json({ message: 'Invalid author id' });
+    }
+    res.status(500).json({ message: err.message });
+  }
+};
+// GET /authors/:id/books
+exports.getBooksByAuthor = async (req, res) => {
+  try {
+    const books = await Book.find({ author: req.params.id }).populate('author');
+    res.json(books);
   } catch (err) {
     if (err.name === 'CastError') {
       return res.status(400).json({ message: 'Invalid author id' });
