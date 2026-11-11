@@ -35,3 +35,38 @@ exports.getBookById = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+// PUT /books/:id
+exports.updateBook = async (req, res) => {
+  try {
+    const book = await Book.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true, runValidators: true }
+    ).populate('author');
+    if (!book) {
+      return res.status(404).json({ message: 'Book not found' });
+    }
+    res.json(book);
+  } catch (err) {
+    if (err.name === 'CastError') {
+      return res.status(400).json({ message: 'Invalid book id' });
+    }
+    res.status(400).json({ message: err.message });
+  }
+};
+
+// DELETE /books/:id
+exports.deleteBook = async (req, res) => {
+  try {
+    const book = await Book.findByIdAndDelete(req.params.id);
+    if (!book) {
+      return res.status(404).json({ message: 'Book not found' });
+    }
+    res.json({ message: 'Book deleted' });
+  } catch (err) {
+    if (err.name === 'CastError') {
+      return res.status(400).json({ message: 'Invalid book id' });
+    }
+    res.status(500).json({ message: err.message });
+  }
+};
