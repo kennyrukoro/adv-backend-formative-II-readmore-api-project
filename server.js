@@ -5,6 +5,9 @@ const mongoose = require('mongoose');
 const app = express();
 app.use(express.json());
 
+const bookRoutes = require('./routes/bookRoutes');
+app.use('/books', bookRoutes);
+
 const authorRoutes = require('./routes/authorRoutes');
 app.use('/authors', authorRoutes);
 
