@@ -24,5 +24,7 @@ async function start() {
     process.exit(1);
   }
 }
+require('./models/Author');
+require('./models/Book');
 
 start();
