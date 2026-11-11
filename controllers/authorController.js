@@ -1,6 +1,6 @@
 const Author = require('../models/Author');
 const Book = require('../models/Book');
-const POLICY = process.env.DELETE_POLICY || 'block';
+
 
 // POST /authors
 exports.createAuthor = async (req, res) => {
@@ -59,6 +59,7 @@ exports.updateAuthor = async (req, res) => {
 };
 
 // DELETE /authors/:id
+// Policy A: block. An author with books cannot be deleted, so catalogue and sales data are never lost by accident.
 exports.deleteAuthor = async (req, res) => {
   try {
     const { id } = req.params;
@@ -68,48 +69,14 @@ exports.deleteAuthor = async (req, res) => {
     }
 
     const bookCount = await Book.countDocuments({ author: id });
-
-    // A: Block. Refuse while the author still has books.
-    if (POLICY === 'block') {
-      if (bookCount > 0) {
-        return res.status(409).json({
-          message: `Author has ${bookCount} book(s); delete or reassign them first`
-        });
-      }
-      await Author.findByIdAndDelete(id);
-      return res.json({ message: 'Author deleted' });
-    }
-
-    // B: Cascade. Delete the author and all their books.
-    if (POLICY === 'cascade') {
-      const result = await Book.deleteMany({ author: id });
-      await Author.findByIdAndDelete(id);
-      return res.json({ message: 'Author and books deleted', booksDeleted: result.deletedCount });
-    }
-
-    // C: Reassign. Move the books to an "Unknown" fallback author, then delete.
-    if (POLICY === 'reassign') {
-      let fallback = await Author.findOne({ name: 'Unknown' });
-      if (!fallback) {
-        fallback = await Author.create({
-          name: 'Unknown',
-          country: 'Unknown',
-          bio: 'Placeholder for books whose author was removed'
-        });
-      }
-      if (fallback._id.equals(author._id)) {
-        return res.status(400).json({ message: 'The fallback author cannot be deleted this way' });
-      }
-      const result = await Book.updateMany({ author: id }, { author: fallback._id });
-      await Author.findByIdAndDelete(id);
-      return res.json({
-        message: 'Author deleted',
-        booksReassigned: result.modifiedCount,
-        reassignedTo: fallback._id
+    if (bookCount > 0) {
+      return res.status(409).json({
+        message: `Author has ${bookCount} book(s); delete or reassign them first`
       });
     }
 
-    res.status(500).json({ message: `Unknown DELETE_POLICY: ${POLICY}` });
+    await Author.findByIdAndDelete(id);
+    res.json({ message: 'Author deleted' });
   } catch (err) {
     if (err.name === 'CastError') {
       return res.status(400).json({ message: 'Invalid author id' });
@@ -123,6 +90,44 @@ exports.getBooksByAuthor = async (req, res) => {
   try {
     const books = await Book.find({ author: req.params.id }).populate('author');
     res.json(books);
+  } catch (err) {
+    if (err.name === 'CastError') {
+      return res.status(400).json({ message: 'Invalid author id' });
+    }
+    res.status(500).json({ message: err.message });
+  }
+};
+// GET /authors/:id/stats
+exports.getAuthorStats = async (req, res) => {
+  try {
+    const author = await Author.findById(req.params.id);
+    if (!author) {
+      return res.status(404).json({ message: 'Author not found' });
+    }
+
+    const books = await Book.find({ author: req.params.id });
+
+    // Sensible defaults for an author with no books
+    if (books.length === 0) {
+      return res.json({
+        author: author.name,
+        bookCount: 0,
+        averagePrice: 0,
+        cheapestBook: null,
+        mostExpensiveBook: null
+      });
+    }
+
+    const total = books.reduce((sum, book) => sum + book.price, 0);
+    const sorted = [...books].sort((a, b) => a.price - b.price);
+
+    res.json({
+      author: author.name,
+      bookCount: books.length,
+      averagePrice: Math.round((total / books.length) * 100) / 100,
+      cheapestBook: sorted[0].title,
+      mostExpensiveBook: sorted[sorted.length - 1].title
+    });
   } catch (err) {
     if (err.name === 'CastError') {
       return res.status(400).json({ message: 'Invalid author id' });

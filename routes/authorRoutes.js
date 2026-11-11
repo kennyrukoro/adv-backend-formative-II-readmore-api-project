@@ -6,6 +6,7 @@ router.post('/', authors.createAuthor);
 router.get('/', authors.getAllAuthors);
 router.get('/:id', authors.getAuthorById);
 router.get('/:id/books', authors.getBooksByAuthor);
+router.get('/:id/stats', authors.getAuthorStats);
 router.put('/:id', authors.updateAuthor);
 router.delete('/:id', authors.deleteAuthor);
 module.exports = router;
